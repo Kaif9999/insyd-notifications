@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import NotificationSidebar from "@/components/notificationSidebar";
+import UserSidebar from "@/components/userSidebar";
 
-// Types for Blog and Job
 interface Blog {
   id: string;
   title: string;
@@ -32,7 +32,6 @@ export default function Home() {
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if user email is stored in localStorage
   useEffect(() => {
     const storedEmail = localStorage.getItem('userEmail');
     if (storedEmail) {
@@ -41,7 +40,6 @@ export default function Home() {
     }
   }, []);
 
-  // Fetch blogs with error handling
   useEffect(() => {
     if (!userEmail) return;
     
@@ -60,14 +58,13 @@ export default function Home() {
         setBlogs(data.blogs || []);
         setError(null);
       })
-      .catch(err => {
+      .catch((err: Error) => {
         console.error('Error fetching blogs:', err);
         setError(`Failed to fetch blogs: ${err.message}`);
         setBlogs([]);
       });
   }, [refresh, userEmail]);
 
-  // Fetch jobs with error handling
   useEffect(() => {
     if (!userEmail) return;
     
@@ -86,24 +83,23 @@ export default function Home() {
         setJobs(data.jobs || []);
         setError(null);
       })
-      .catch(err => {
+      .catch((err: Error) => {
         console.error('Error fetching jobs:', err);
         setError(`Failed to fetch jobs: ${err.message}`);
         setJobs([]);
       });
   }, [refresh, userEmail]);
 
-  // Poll for updates every 30s
   useEffect(() => {
     if (!userEmail) return;
     const interval = setInterval(() => setRefresh(r => r + 1), 30000);
     return () => clearInterval(interval);
   }, [userEmail]);
 
-  // Handle email registration/login
-  const handleEmailSubmit = async (e: any) => {
+  const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const email = e.target.email.value;
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
     
     try {
       const response = await fetch("/api/auth/register", {
@@ -121,18 +117,18 @@ export default function Home() {
       setShowEmailForm(false);
     } catch (error) {
       console.error('Error registering:', error);
-      setError(`Failed to register: ${error.message}`);
+      setError(`Failed to register: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   // Handle blog submission
-  const handleBlogSubmit = async (e: any) => {
+  const handleBlogSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = e.target;
+    const formData = new FormData(e.currentTarget);
     const body = {
       email: userEmail,
-      title: form.title.value,
-      content: form.content.value,
+      title: formData.get('title') as string,
+      content: formData.get('content') as string,
     };
     
     try {
@@ -148,21 +144,21 @@ export default function Home() {
       
       setShowBlogForm(false);
       setRefresh(r => r + 1);
-      form.reset();
+      e.currentTarget.reset();
     } catch (error) {
       console.error('Error submitting blog:', error);
-      setError(`Failed to submit blog: ${error.message}`);
+      setError(`Failed to submit blog: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   // Handle job submission
-  const handleJobSubmit = async (e: any) => {
+  const handleJobSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = e.target;
+    const formData = new FormData(e.currentTarget);
     const body = {
       email: userEmail,
-      company: form.company.value,
-      title: form.title.value,
+      company: formData.get('company') as string,
+      title: formData.get('title') as string,
     };
     
     try {
@@ -178,10 +174,10 @@ export default function Home() {
       
       setShowJobForm(false);
       setRefresh(r => r + 1);
-      form.reset();
+      e.currentTarget.reset();
     } catch (error) {
       console.error('Error submitting job:', error);
-      setError(`Failed to submit job: ${error.message}`);
+      setError(`Failed to submit job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -201,7 +197,7 @@ export default function Home() {
       setRefresh(r => r + 1);
     } catch (error) {
       console.error('Error liking blog:', error);
-      setError(`Failed to like blog: ${error.message}`);
+      setError(`Failed to like blog: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -221,7 +217,7 @@ export default function Home() {
       setRefresh(r => r + 1);
     } catch (error) {
       console.error('Error applying to job:', error);
-      setError(`Failed to apply to job: ${error.message}`);
+      setError(`Failed to apply to job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -241,7 +237,27 @@ export default function Home() {
       setRefresh(r => r + 1);
     } catch (error) {
       console.error('Error deleting blog:', error);
-      setError(`Failed to delete blog: ${error.message}`);
+      setError(`Failed to delete blog: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // Handle delete job
+  const handleDeleteJob = async (jobId: string) => {
+    try {
+      const response = await fetch(`/api/jobs/${jobId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userEmail }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      setRefresh(r => r + 1);
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      setError(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -265,7 +281,7 @@ export default function Home() {
               Notifications
             </h1>
             <p className="text-purple-100 text-lg">
-              The architecture community's notification hub
+              The architecture community&apos;s notification hub
             </p>
           </div>
           
@@ -302,6 +318,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      <NotificationSidebar email={userEmail || ""} />
       <main className="flex-1 p-8 relative">
         {/* Header */}
         <div className="flex justify-between items-center mb-8 border-b border-gray-200 pb-4">
@@ -334,14 +351,21 @@ export default function Home() {
             <div className="space-y-4">
               {blogs.map(blog => (
                 <div key={blog.id} className="border border-gray-200 p-6 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    {blog.title}
-                  </h3>
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      {blog.title}
+                    </h3>
+                    <span className="text-sm text-gray-500">
+                      by {blog.author.email}
+                    </span>
+                  </div>
                   <p className="text-gray-700 leading-relaxed mb-4">
                     {blog.content}
                   </p>
                   <div className="flex justify-between items-center">
-                    <small className="text-gray-500">by {blog.author.email}</small>
+                    <small className="text-gray-500">
+                      {new Date(blog.createdAt).toLocaleDateString()}
+                    </small>
                     <div className="flex gap-3 items-center">
                       <button 
                         onClick={() => handleLikeBlog(blog.id)}
@@ -374,12 +398,19 @@ export default function Home() {
             <div className="space-y-4">
               {jobs.map(job => (
                 <div key={job.id} className="border border-gray-200 p-6 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                    {job.title}
-                  </h3>
-                  <p className="text-gray-700 mb-4">{job.company}</p>
+                  <div className="flex items-start justify-between mb-1">
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      {job.title}
+                    </h3>
+                    <span className="text-sm text-gray-500">
+                      by {job.author.email}
+                    </span>
+                  </div>
+                  <p className="text-gray-700 mb-4 font-medium">{job.company}</p>
                   <div className="flex justify-between items-center">
-                    <small className="text-gray-500">by {job.author.email}</small>
+                    <small className="text-gray-500">
+                      {new Date(job.createdAt).toLocaleDateString()}
+                    </small>
                     <div className="flex gap-3 items-center">
                       {job.author.email !== userEmail && (
                         <button 
@@ -387,6 +418,14 @@ export default function Home() {
                           className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                         >
                           Apply
+                        </button>
+                      )}
+                      {job.author.email === userEmail && (
+                        <button 
+                          onClick={() => handleDeleteJob(job.id)}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
+                        >
+                          Delete
                         </button>
                       )}
                       <span className="text-sm text-gray-600">
@@ -521,7 +560,9 @@ export default function Home() {
           </button>
         </div>
       </main>
-      <NotificationSidebar email={userEmail || ""} />
+      
+      
+      <UserSidebar currentUserEmail={userEmail || ""} />
     </div>
   );
 }

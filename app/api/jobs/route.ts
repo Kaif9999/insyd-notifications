@@ -4,12 +4,16 @@ import { sendEmail } from "@/lib/mailer";
 
 export async function GET() {
   try {
-    console.log("Attempting to fetch jobs...");
     const jobs = await prisma.job.findMany({
       include: {
         author: {
           select: {
             email: true,
+          },
+        },
+        _count: {
+          select: {
+            applications: true,
           },
         },
       },
@@ -18,26 +22,16 @@ export async function GET() {
       },
     });
 
-    // Manually get application counts for each job
-    const jobsWithApplications = await Promise.all(
-      jobs.map(async (job) => {
-        const applicationCount = await prisma.jobApplication.count({
-          where: { jobId: job.id },
-        });
-        return {
-          ...job,
-          applications: applicationCount,
-        };
-      })
-    );
+    const jobsWithApplications = jobs.map((job: { _count: { applications: any; }; }) => ({
+      ...job,
+      applications: job._count.applications,
+    }));
 
-    console.log("Jobs fetched successfully:", jobs.length);
     return NextResponse.json({ jobs: jobsWithApplications });
   } catch (error) {
     console.error("Error fetching jobs:", error);
     return NextResponse.json(
-      //@ts-ignore
-      { error: "Failed to fetch jobs", details: error.message },
+      { error: "Failed to fetch jobs" },
       { status: 500 }
     );
   }
@@ -46,33 +40,35 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, title, company } = body;
+    const { email, company, title } = body;
 
-    console.log("Creating job with data:", { email, title, company });
+    console.log("Creating job with data:", { email, company, title });
 
-    // First, find or create the user
-    let user = await prisma.user.findUnique({
+    if (!email || !company || !title) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Find the user
+    const user = await prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
-      // Let Prisma handle the timestamps automatically
-      user = await prisma.user.create({
-        data: { 
-          email
-          // Remove createdAt - let @default(now()) handle it
-          // Remove updatedAt - let @updatedAt handle it
-        },
-      });
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
     }
 
-    // Let Prisma handle the timestamps automatically for job creation too
+    // Create the job
     const job = await prisma.job.create({
       data: {
         title,
         company,
         authorId: user.id,
-        // Remove createdAt and updatedAt - let Prisma handle them
       },
       include: {
         author: {
@@ -83,53 +79,65 @@ export async function POST(request: Request) {
       },
     });
 
-    console.log("Job created successfully:", job.id);
+    // Get followers of the user who created the job
+    const followers = await prisma.follow.findMany({
+      where: { followingId: user.id },
+      include: { follower: true }
+    });
 
-    // Send email notifications to all users
-    try {
-      const allUsers = await prisma.user.findMany({
-        where: { email: { not: email } }, // Don't send to the author
+    console.log(`Found ${followers.length} followers for user ${email}`);
+
+    // Create notifications and send emails only to followers
+    for (const follow of followers) {
+      // Create in-app notification
+      await prisma.notification.create({
+        data: {
+          title: "New Job Posting",
+          message: `${email} posted a new job at ${company}: ${title}`,
+          type: "job",
+          userId: follow.follower.id,
+        },
       });
 
-      console.log(`Sending job notifications to ${allUsers.length} users`);
-
-      for (const notifyUser of allUsers) {
-        // Send email notification
+      // Send email to follower
+      try {
         await sendEmail({
-          to: notifyUser.email,
-          subject: `💼 New Job Opportunity: ${title} at ${company}`,
+          to: follow.follower.email,
+          subject: "💼 New Job Opportunity from Someone You Follow",
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #333;">New Job Opportunity on Insyd!</h2>
-              <p><strong>${user.email}</strong> just posted a new job:</p>
-              <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #2563eb;">
-                <h3 style="margin: 0 0 10px 0; color: #1d4ed8;">${title}</h3>
-                <p style="margin: 0; color: #666;"><strong>Company:</strong> ${company}</p>
+              <h2 style="color: #8E5BC2;">New Job Opportunity!</h2>
+              <p>Hi there!</p>
+              <p><strong>${email}</strong> just posted a new job opportunity that might interest you:</p>
+              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #333; margin: 0 0 10px 0;">${title}</h3>
+                <p style="color: #666; margin: 0;"><strong>Company:</strong> ${company}</p>
               </div>
-              <p style="color: #666;">Visit <a href="http://localhost:3000">Insyd</a> to learn more about this opportunity!</p>
+              <p>
+                <a href="http://localhost:3000" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  View Job & Apply
+                </a>
+              </p>
+              <p style="color: #666; font-size: 14px;">
+                You received this because you follow ${email} on Insyd.
+              </p>
             </div>
           `,
-          text: `${user.email} posted a new job: ${title} at ${company}\n\nVisit http://localhost:3000 to learn more!`,
+          text: `${email} posted a new job at ${company}: ${title}`,
         });
-
-        // Create notification record in database (let Prisma handle timestamps)
-        await prisma.notification.create({
-          data: {
-            title: `New Job: ${title}`,
-            content: `${user.email} posted a job at ${company}`,
-            recipientId: notifyUser.id,
-            // Remove createdAt and updatedAt - let Prisma handle them
-          },
-        });
+        console.log(`Job notification email sent to ${follow.follower.email}`);
+      } catch (emailError) {
+        console.error("Failed to send job email to", follow.follower.email, ":", emailError);
       }
-
-      console.log("Job email notifications sent successfully");
-    } catch (emailError) {
-      console.error("Failed to send job notifications:", emailError);
-      // Don't fail the job creation if email fails
     }
 
-    return NextResponse.json({ job });
+    console.log(`Job created successfully. Notified ${followers.length} followers.`);
+
+    return NextResponse.json({
+      message: "Job created successfully",
+      job,
+      notifiedFollowers: followers.length
+    });
   } catch (error) {
     console.error("Error creating job:", error);
     return NextResponse.json(

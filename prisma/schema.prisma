@@ -18,8 +18,25 @@ model User {
   blogLikes     BlogLike[]
   jobApplications JobApplication[]
   
+  // Follow relationships
+  following     Follow[] @relation("UserFollowing")
+  followers     Follow[] @relation("UserFollowers")
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Follow {
+  id          String @id @default(cuid())
+  followerId  String
+  followingId String
+  
+  follower    User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([followerId, followingId])
 }
 
 model Job {
@@ -51,38 +68,38 @@ model Blog {
 model Notification {
   id          String  @id @default(cuid())
   title       String
-  content     String
+  message     String
   read        Boolean @default(false)
-  recipientId String
+  type        String
+  userId      String
   
-  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
 }
 
 model BlogLike {
   id     String @id @default(cuid())
-  blogId String
   userId String
+  blogId String
   
-  blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blog   Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
   
   createdAt DateTime @default(now())
   
-  @@unique([blogId, userId])
+  @@unique([userId, blogId])
 }
 
 model JobApplication {
   id     String @id @default(cuid())
-  jobId  String
   userId String
+  jobId  String
   
-  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job    Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
   
   createdAt DateTime @default(now())
   
-  @@unique([jobId, userId])
+  @@unique([userId, jobId])
 }

@@ -4,12 +4,16 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    console.log("Attempting to fetch blogs...");
     const blogs = await prisma.blog.findMany({
       include: {
         author: {
           select: {
             email: true,
+          },
+        },
+        _count: {
+          select: {
+            likes: true,
           },
         },
       },
@@ -18,60 +22,53 @@ export async function GET() {
       },
     });
 
-    // Manually get like counts for each blog
-    const blogsWithLikes = await Promise.all(
-      blogs.map(async (blog) => {
-        const likeCount = await prisma.blogLike.count({
-          where: { blogId: blog.id },
-        });
-        return {
-          ...blog,
-          likes: likeCount,
-        };
-      })
-    );
+    const blogsWithLikes = blogs.map((blog: { _count: { likes: any; }; }) => ({
+      ...blog,
+      likes: blog._count.likes,
+    }));
 
-    console.log("Blogs fetched successfully:", blogs.length);
     return NextResponse.json({ blogs: blogsWithLikes });
   } catch (error) {
     console.error("Error fetching blogs:", error);
     return NextResponse.json(
-      //@ts-ignore
-      { error: "Failed to fetch blogs", details: error.message },
+      { error: "Failed to fetch blogs" },
       { status: 500 }
     );
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
+    const body = await request.json();
     const { email, title, content } = body;
 
     console.log("Creating blog with data:", { email, title, content });
 
-    // First, find or create the user
-    let user = await prisma.user.findUnique({
+    if (!email || !title || !content) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Find the user
+    const user = await prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
-      // Let Prisma handle the timestamps automatically
-      user = await prisma.user.create({
-        data: { 
-          email
-          // Remove manual timestamp setting
-        },
-      });
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
     }
 
-    // Let Prisma handle the timestamps automatically
+    // Create the blog
     const blog = await prisma.blog.create({
       data: {
         title,
         content,
         authorId: user.id,
-        // Remove manual timestamp setting
       },
       include: {
         author: {
@@ -82,56 +79,65 @@ export async function POST(req: Request) {
       },
     });
 
-    console.log("Blog created successfully:", blog.id);
+    // Get followers of the user who created the blog
+    const followers = await prisma.follow.findMany({
+      where: { followingId: user.id },
+      include: { follower: true }
+    });
 
-    // Send email notifications to all users
-    try {
-      const allUsers = await prisma.user.findMany({
-        where: { email: { not: email } }, // Don't send to the author
+    console.log(`Found ${followers.length} followers for user ${email}`);
+
+    // Create notifications and send emails only to followers
+    for (const follow of followers) {
+      // Create in-app notification
+      await prisma.notification.create({
+        data: {
+          title: "New Blog Post",
+          message: `${email} posted a new blog: ${title}`,
+          type: "blog",
+          userId: follow.follower.id,
+        },
       });
 
-      console.log(`Sending notifications to ${allUsers.length} users`);
-
-      for (const notifyUser of allUsers) {
-        // Send email notification
+      // Send email to follower
+      try {
         await sendEmail({
-          to: notifyUser.email,
-          subject: `🔥 New Blog Post: ${title}`,
+          to: follow.follower.email,
+          subject: "📝 New Blog Post from Someone You Follow",
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #333;">New Blog Post on Insyd!</h2>
-              <p><strong>${user.email}</strong> just posted a new blog:</p>
-              <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                <h3 style="margin: 0 0 10px 0; color: #2563eb;">${title}</h3>
-                <p style="margin: 0; color: #666;">${content.substring(
-                  0,
-                  200
-                )}${content.length > 200 ? "..." : ""}</p>
+              <h2 style="color: #8E5BC2;">New Blog Post!</h2>
+              <p>Hi there!</p>
+              <p><strong>${email}</strong> just posted a new blog that you might be interested in:</p>
+              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #333; margin: 0 0 10px 0;">${title}</h3>
+                <p style="color: #666; margin: 0;">${content.substring(0, 200)}${content.length > 200 ? '...' : ''}</p>
               </div>
-              <p style="color: #666;">Visit <a href="http://localhost:3000">Insyd</a> to read the full post!</p>
+              <p>
+                <a href="http://localhost:3000" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  Read Full Post
+                </a>
+              </p>
+              <p style="color: #666; font-size: 14px;">
+                You received this because you follow ${email} on Insyd.
+              </p>
             </div>
           `,
-          text: `${user.email} posted a new blog: ${title}\n\n${content}\n\nVisit http://localhost:3000 to read more!`,
+          text: `${email} posted a new blog: ${title}. ${content.substring(0, 200)}${content.length > 200 ? '...' : ''}`,
         });
-
-        // Create notification record in database (let Prisma handle timestamps)
-        await prisma.notification.create({
-          data: {
-            title: `New Blog Post: ${title}`,
-            content: `${user.email} posted a new blog post`,
-            recipientId: notifyUser.id,
-            // Remove manual timestamp setting
-          },
-        });
+        console.log(`Blog notification email sent to ${follow.follower.email}`);
+      } catch (emailError) {
+        console.error("Failed to send blog email to", follow.follower.email, ":", emailError);
       }
-
-      console.log("Email notifications sent successfully");
-    } catch (emailError) {
-      console.error("Failed to send notifications:", emailError);
-      // Don't fail the blog creation if email fails
     }
 
-    return NextResponse.json({ blog });
+    console.log(`Blog created successfully. Notified ${followers.length} followers.`);
+
+    return NextResponse.json({
+      message: "Blog created successfully",
+      blog,
+      notifiedFollowers: followers.length
+    });
   } catch (error) {
     console.error("Error creating blog:", error);
     return NextResponse.json(
