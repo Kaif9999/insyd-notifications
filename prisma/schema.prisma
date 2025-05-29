@@ -1,12 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  output   = "../app/generated/prisma"
 }
 
 datasource db {
@@ -15,38 +8,81 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
-  blogs     Blog[]
-  jobs      Job[]
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  
+  blogs         Blog[]
+  jobs          Job[]
   notifications Notification[]
+  blogLikes     BlogLike[]
+  jobApplications JobApplication[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Job {
+  id           String   @id @default(cuid())
+  title        String
+  company      String
+  authorId     String
+  
+  author       User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  applications JobApplication[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Blog {
   id        String   @id @default(cuid())
   title     String
   content   String
-  author    User     @relation(fields: [authorId], references: [id])
   authorId  String
+  
+  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes     BlogLike[]
+  
   createdAt DateTime @default(now())
-}
-
-model Job {
-  id        String   @id @default(cuid())
-  title     String
-  company   String
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
-  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Notification {
-  id        String   @id @default(cuid())
-  type      String
-  message   String
-  recipient User     @relation(fields: [recipientId], references: [id])
+  id          String  @id @default(cuid())
+  title       String
+  content     String
+  read        Boolean @default(false)
   recipientId String
-  read      Boolean  @default(false)
+  
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BlogLike {
+  id     String @id @default(cuid())
+  blogId String
+  userId String
+  
+  blog Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([blogId, userId])
+}
+
+model JobApplication {
+  id     String @id @default(cuid())
+  jobId  String
+  userId String
+  
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([jobId, userId])
 }
