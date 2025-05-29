@@ -25,19 +25,19 @@ export default function UserSidebar({ currentUserEmail }: UserSidebarProps) {
 
   const fetchUsers = async () => {
     try {
-      console.log('Fetching users for:', currentUserEmail); // Debug log
+      console.log('Fetching users for:', currentUserEmail); 
       const response = await fetch(`/api/users?currentUser=${encodeURIComponent(currentUserEmail)}`);
       
-      console.log('Response status:', response.status); // Debug log
+      console.log('Response status:', response.status); 
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Error:', errorText); // Debug log
+        console.error('API Error:', errorText); 
         throw new Error('Failed to fetch users');
       }
       
       const data = await response.json();
-      console.log('Users data received:', data); // Debug log
+      console.log('Users data received:', data); 
       
       setUsers(data.users || []);
       setError(null);

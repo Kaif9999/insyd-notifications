@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Fix: Add proper type for the params
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
 export async function DELETE(
   request: Request,
-  { params }: RouteParams // Fix: Use the proper type
+  { params }: RouteParams
 ) {
   try {
-    // Await the params since it's a Promise in Next.js 15
     const { id } = await params;
     
     const body = await request.json();
@@ -24,7 +22,6 @@ export async function DELETE(
       );
     }
 
-    // Find the user
     const user = await prisma.user.findUnique({
       where: { email: userEmail },
     });
@@ -36,7 +33,6 @@ export async function DELETE(
       );
     }
 
-    // Check if the job exists and belongs to the user
     const job = await prisma.job.findFirst({
       where: {
         id: id,
@@ -51,7 +47,6 @@ export async function DELETE(
       );
     }
 
-    // Delete the job
     await prisma.job.delete({
       where: { id: id },
     });

@@ -1,109 +1,125 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { sendEmail } from '@/lib/mailer';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { sendEmail } from "@/lib/mailer";
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: RouteParams
 ) {
   try {
+    const { id: blogId } = await params;
+    
     const body = await request.json();
     const { userEmail } = body;
-    const { id: blogId } = await params; // Fix: await params
 
-    console.log('Processing like for blog:', blogId, 'by user:', userEmail);
-
-    // Get the blog with author info
-    const blog = await prisma.blog.findUnique({
-      where: { id: blogId },
-      include: {
-        author: {
-          select: { email: true }
-        }
-      }
-    });
-
-    if (!blog) {
-      return NextResponse.json({ error: 'Blog not found' }, { status: 404 });
+    if (!userEmail) {
+      return NextResponse.json(
+        { error: "User email is required" },
+        { status: 400 }
+      );
     }
 
-    // Find the user who liked
+    // Find the user who is liking
     const liker = await prisma.user.findUnique({
-      where: { email: userEmail }
+      where: { email: userEmail },
     });
 
     if (!liker) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
     }
 
-    // Check if already liked
+    // Check if the blog exists
+    const blog = await prisma.blog.findUnique({
+      where: { id: blogId },
+      include: {
+        author: true,
+      },
+    });
+
+    if (!blog) {
+      return NextResponse.json(
+        { error: "Blog not found" },
+        { status: 404 }
+      );
+    }
+
+    // Check if already liked - Fix: Use correct field order
     const existingLike = await prisma.blogLike.findUnique({
       where: {
-        blogId_userId: {
-          blogId: blogId,
-          userId: liker.id
+        userId_blogId: { // Fix: Correct order (userId first, then blogId)
+          userId: liker.id,
+          blogId: blogId
         }
       }
     });
 
     if (existingLike) {
-      // Unlike the blog
-      await prisma.blogLike.delete({
-        where: { id: existingLike.id }
-      });
-    } else {
-      // Like the blog
-      await prisma.blogLike.create({
+      return NextResponse.json(
+        { error: "Already liked this blog" },
+        { status: 400 }
+      );
+    }
+
+    // Create the like
+    await prisma.blogLike.create({
+      data: {
+        userId: liker.id,
+        blogId: blogId,
+      },
+    });
+
+    // Create notification for blog author (if not self-like)
+    if (blog.author.id !== liker.id) {
+      await prisma.notification.create({
         data: {
-          blogId: blogId,
-          userId: liker.id
-        }
+          title: "Blog Liked",
+          message: `${userEmail} liked your blog: ${blog.title}`,
+          type: "like",
+          userId: blog.author.id,
+        },
       });
 
-      // Send email notification to blog author (only if different user)
-      if (blog.author.email !== userEmail) {
-        try {
-          await sendEmail({
-            to: blog.author.email,
-            subject: `👍 Someone liked your blog: ${blog.title}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #333;">Your blog got a like! 👍</h2>
-                <p><strong>${userEmail}</strong> liked your blog post:</p>
-                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                  <h3 style="margin: 0 0 10px 0; color: #2563eb;">${blog.title}</h3>
-                </div>
-                <p style="color: #666;">Visit <a href="http://localhost:3000">Insyd</a> to see your blog!</p>
+      // Send email notification
+      try {
+        await sendEmail({
+          to: blog.author.email,
+          subject: "👍 Someone liked your blog!",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #8E5BC2;">Blog Liked!</h2>
+              <p>Hi there!</p>
+              <p><strong>${userEmail}</strong> liked your blog post:</p>
+              <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #333; margin: 0;">${blog.title}</h3>
               </div>
-            `,
-            text: `${userEmail} liked your blog: ${blog.title}`,
-          });
-
-          // Create in-app notification
-          await prisma.notification.create({
-            data: {
-              title: `👍 Your blog got a like!`,
-              content: `${userEmail} liked your blog: ${blog.title}`,
-              recipientId: blog.authorId,
-            },
-          });
-        } catch (emailError) {
-          console.error('Failed to send like notification:', emailError);
-        }
+              <p>
+                <a href="http://localhost:3000" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  View Your Blog
+                </a>
+              </p>
+            </div>
+          `,
+          text: `${userEmail} liked your blog: ${blog.title}`,
+        });
+      } catch (emailError) {
+        console.error("Failed to send like email:", emailError);
       }
     }
 
-    // Get updated like count
-    const likeCount = await prisma.blogLike.count({
-      where: { blogId: blogId }
+    return NextResponse.json({
+      message: "Blog liked successfully",
     });
-
-    return NextResponse.json({ likes: likeCount });
   } catch (error) {
-    console.error('Error processing blog like:', error);
+    console.error("Error liking blog:", error);
     return NextResponse.json(
-      //@ts-ignore
-      { error: 'Failed to process like', details: error.message },
+      { error: "Failed to like blog" },
       { status: 500 }
     );
   }
