@@ -22,7 +22,7 @@ export async function GET() {
       },
     });
 
-    const blogsWithLikes = blogs.map((blog: { _count: { likes: any; }; }) => ({
+    const blogsWithLikes = blogs.map((blog: { _count: { likes: number; }; }) => ({
       ...blog,
       likes: blog._count.likes,
     }));
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
                 <p style="color: #666; margin: 0;">${content.substring(0, 200)}${content.length > 200 ? '...' : ''}</p>
               </div>
               <p>
-                <a href="http://localhost:3000" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                <a href="https://insyd-notifications.vercel.app/" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                   Read Full Post
                 </a>
               </p>
@@ -141,8 +141,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error creating blog:", error);
     return NextResponse.json(
-      //@ts-ignore
-      { error: "Failed to create blog", details: error.message },
+      { error: "Failed to create blog", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }

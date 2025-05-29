@@ -100,7 +100,7 @@ export async function POST(
               <p style="color: #666; margin: 0;"><strong>Company:</strong> ${job.company}</p>
             </div>
             <p>
-              <a href="http://localhost:3000" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              <a href="https://insyd-notifications.vercel.app/" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                 View Applications
               </a>
             </p>

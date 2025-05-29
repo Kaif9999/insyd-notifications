@@ -100,7 +100,7 @@ export async function POST(
                 <h3 style="color: #333; margin: 0;">${blog.title}</h3>
               </div>
               <p>
-                <a href="http://localhost:3000" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                <a href="https://insyd-notifications.vercel.app/" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                   View Your Blog
                 </a>
               </p>

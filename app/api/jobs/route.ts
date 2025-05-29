@@ -22,7 +22,7 @@ export async function GET() {
       },
     });
 
-    const jobsWithApplications = jobs.map((job: { _count: { applications: any; }; }) => ({
+    const jobsWithApplications = jobs.map((job: { _count: { applications: number; }; }) => ({
       ...job,
       applications: job._count.applications,
     }));
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
                 <p style="color: #666; margin: 0;"><strong>Company:</strong> ${company}</p>
               </div>
               <p>
-                <a href="http://localhost:3000" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                <a href="https://insyd-notifications.vercel.app/" style="background: #8E5BC2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                   View Job & Apply
                 </a>
               </p>
@@ -141,8 +141,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error creating job:", error);
     return NextResponse.json(
-      //@ts-ignore
-      { error: "Failed to create job", details: error.message },
+      { error: "Failed to create job", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }

@@ -37,7 +37,7 @@ export async function POST(request: Request) {
                 <li>New content is posted by other members</li>
               </ul>
               <p>Start sharing your architectural insights and discoveries!</p>
-              <p style="color: #666;">Visit <a href="http://localhost:3000">Insyd</a> to get started!</p>
+              <p style="color: #666;">Visit <a href="https://insyd-notifications.vercel.app/">Insyd</a> to get started!</p>
             </div>
           `,
           text: `Welcome to Insyd! You'll receive notifications for interactions with your content.`,
@@ -55,8 +55,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error registering user:', error);
     return NextResponse.json(
-      //@ts-ignore
-      { error: 'Failed to register user', details: error.message },
+      { error: 'Failed to register user', details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }
