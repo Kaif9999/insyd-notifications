@@ -1,6 +1,6 @@
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/mailer";
-import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
@@ -31,7 +31,7 @@ export async function GET() {
   } catch (error) {
     console.error("Error fetching blogs:", error);
     return NextResponse.json(
-      { error: "Failed to fetch blogs" },
+      { error: "Failed to fetch blogs", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }
@@ -40,13 +40,14 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, title, content } = body;
+    const { email, title, content } = body; // Fix: Use title and content, not company
 
     console.log("Creating blog with data:", { email, title, content });
 
+    // Fix: Check for title and content, not company
     if (!email || !title || !content) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required fields: email, title, and content are required" },
         { status: 400 }
       );
     }
@@ -63,11 +64,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create the blog
+    // Create the blog with correct fields
     const blog = await prisma.blog.create({
       data: {
         title,
-        content,
+        content, // Fix: Use content field
         authorId: user.id,
       },
       include: {

@@ -2,8 +2,19 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/mailer";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const currentUserEmail = searchParams.get('currentUser');
+
+    // Get current user if provided
+    let currentUser = null;
+    if (currentUserEmail) {
+      currentUser = await prisma.user.findUnique({
+        where: { email: currentUserEmail },
+      });
+    }
+
     const jobs = await prisma.job.findMany({
       include: {
         author: {
@@ -16,22 +27,31 @@ export async function GET() {
             applications: true,
           },
         },
+        applications: currentUser ? {
+          where: {
+            userId: currentUser.id,
+          },
+          select: {
+            id: true,
+          },
+        } : false,
       },
       orderBy: {
         createdAt: "desc",
       },
     });
 
-    const jobsWithApplications = jobs.map((job: { _count: { applications: number; }; }) => ({
+    const jobsWithApplications = jobs.map((job: { _count: { applications: any; }; applications: string | any[]; }) => ({
       ...job,
       applications: job._count.applications,
+      hasApplied: currentUser ? job.applications.length > 0 : false,
     }));
 
     return NextResponse.json({ jobs: jobsWithApplications });
   } catch (error) {
     console.error("Error fetching jobs:", error);
     return NextResponse.json(
-      { error: "Failed to fetch jobs" },
+      { error: "Failed to fetch jobs", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }

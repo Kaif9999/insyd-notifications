@@ -9,7 +9,6 @@ export async function POST(request: Request) {
 
     console.log('Registering user with email:', email);
 
-    // Check if user already exists
     let user = await prisma.user.findUnique({
       where: { email },
     });
@@ -20,7 +19,7 @@ export async function POST(request: Request) {
         data: { email },
       });
 
-      // Send welcome email
+      // welcome email
       try {
         await sendEmail({
           to: email,

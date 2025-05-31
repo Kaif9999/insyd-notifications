@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import NotificationSidebar from "@/components/notificationSidebar";
 import UserSidebar from "@/components/userSidebar";
 
@@ -20,6 +20,7 @@ interface Job {
   author: { email: string };
   createdAt: string;
   applications: number;
+  hasApplied?: boolean; // Add this field
 }
 
 export default function Home() {
@@ -31,6 +32,10 @@ export default function Home() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [refresh, setRefresh] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Add form refs
+  const blogFormRef = useRef<HTMLFormElement>(null);
+  const jobFormRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     const storedEmail = localStorage.getItem('userEmail');
@@ -68,7 +73,8 @@ export default function Home() {
   useEffect(() => {
     if (!userEmail) return;
     
-    fetch("/api/jobs")
+    // Update jobs fetch to include current user email for application status
+    fetch(`/api/jobs?currentUser=${encodeURIComponent(userEmail)}`)
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
@@ -121,7 +127,7 @@ export default function Home() {
     }
   };
 
-  // Handle blog submission
+  // Handle blog submission with ref
   const handleBlogSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -139,19 +145,22 @@ export default function Home() {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
       
+      // Reset using ref (safer)
+      blogFormRef.current?.reset();
       setShowBlogForm(false);
       setRefresh(r => r + 1);
-      e.currentTarget.reset();
+      setError(null);
     } catch (error) {
       console.error('Error submitting blog:', error);
       setError(`Failed to submit blog: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
-  // Handle job submission
+  // Handle job submission with ref
   const handleJobSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -169,12 +178,15 @@ export default function Home() {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
       
+      // Reset using ref (safer)
+      jobFormRef.current?.reset();
       setShowJobForm(false);
       setRefresh(r => r + 1);
-      e.currentTarget.reset();
+      setError(null);
     } catch (error) {
       console.error('Error submitting job:', error);
       setError(`Failed to submit job: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -211,7 +223,8 @@ export default function Home() {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
       
       setRefresh(r => r + 1);
@@ -318,8 +331,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <NotificationSidebar email={userEmail || ""} />
-      <main className="flex-1 p-8 relative">
+      {/* Fixed positioned sidebars */}
+      <div className="fixed left-0 top-0 h-screen z-10">
+        <NotificationSidebar email={userEmail || ""} />
+      </div>
+      
+      {/* Main content with proper margins */}
+      <main className="flex-1 ml-80 mr-80 p-8 relative">
         {/* Header */}
         <div className="flex justify-between items-center mb-8 border-b border-gray-200 pb-4">
           <h1 className="text-3xl font-bold text-gray-900">
@@ -414,10 +432,15 @@ export default function Home() {
                     <div className="flex gap-3 items-center">
                       {job.author.email !== userEmail && (
                         <button 
-                          onClick={() => handleApplyJob(job.id)}
-                          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                          onClick={() => !job.hasApplied && handleApplyJob(job.id)}
+                          disabled={job.hasApplied}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            job.hasApplied
+                              ? 'bg-gray-200 text-gray-600 cursor-not-allowed'
+                              : 'bg-purple-600 hover:bg-purple-700 text-white'
+                          }`}
                         >
-                          Apply
+                          {job.hasApplied ? 'Applied' : 'Apply'}
                         </button>
                       )}
                       {job.author.email === userEmail && (
@@ -439,111 +462,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* Blog Form Modal */}
-        {showBlogForm && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <form 
-              onSubmit={handleBlogSubmit} 
-              className="bg-white rounded-xl p-6 w-full max-w-lg shadow-2xl"
-            >
-              <h2 className="text-2xl font-semibold text-gray-900 mb-5">
-                Create a Blog Post
-              </h2>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Title
-                </label>
-                <input 
-                  type="text" 
-                  name="title" 
-                  required 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Blog title" 
-                />
-              </div>
-              <div className="mb-5">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Content
-                </label>
-                <textarea 
-                  name="content" 
-                  required 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg h-32 resize-vertical focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Write your blog content..."
-                />
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  type="submit" 
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                >
-                  Post Blog
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setShowBlogForm(false)}
-                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Job Form Modal */}
-        {showJobForm && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <form 
-              onSubmit={handleJobSubmit} 
-              className="bg-white rounded-xl p-6 w-full max-w-lg shadow-2xl"
-            >
-              <h2 className="text-2xl font-semibold text-gray-900 mb-5">
-                Post a Job
-              </h2>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Company
-                </label>
-                <input 
-                  type="text" 
-                  name="company" 
-                  required 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Company name" 
-                />
-              </div>
-              <div className="mb-5">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Job Title
-                </label>
-                <input 
-                  type="text" 
-                  name="title" 
-                  required 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Job title" 
-                />
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  type="submit" 
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                >
-                  Post Job
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setShowJobForm(false)}
-                  className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
         {/* Bottom Action Buttons */}
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 flex gap-4 z-20">
           <button 
@@ -561,8 +479,122 @@ export default function Home() {
         </div>
       </main>
       
-      
-      <UserSidebar currentUserEmail={userEmail || ""} />
+      {/* Fixed positioned right sidebar */}
+      <div className="fixed right-0 top-0 h-screen z-10">
+        <UserSidebar currentUserEmail={userEmail || ""} />
+      </div>
+
+      {/* Modal Forms remain the same */}
+      {showBlogForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <form 
+            ref={blogFormRef}
+            onSubmit={handleBlogSubmit} 
+            className="bg-white rounded-xl p-6 w-full max-w-lg shadow-2xl"
+          >
+            <h2 className="text-2xl font-semibold text-gray-900 mb-5">
+              Create a Blog Post
+            </h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Title
+              </label>
+              <input 
+                type="text" 
+                name="title" 
+                required 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Blog title" 
+              />
+            </div>
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Content
+              </label>
+              <textarea 
+                name="content" 
+                required 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg h-32 resize-vertical focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Write your blog content..."
+              />
+            </div>
+            <div className="flex gap-3">
+              <button 
+                type="submit" 
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+              >
+                Post Blog
+              </button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  blogFormRef.current?.reset();
+                  setShowBlogForm(false);
+                }}
+                className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showJobForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <form 
+            ref={jobFormRef}
+            onSubmit={handleJobSubmit} 
+            className="bg-white rounded-xl p-6 w-full max-w-lg shadow-2xl"
+          >
+            <h2 className="text-2xl font-semibold text-gray-900 mb-5">
+              Post a Job
+            </h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Company
+              </label>
+              <input 
+                type="text" 
+                name="company" 
+                required 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Company name" 
+              />
+            </div>
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Job Title
+              </label>
+              <input 
+                type="text" 
+                name="title" 
+                required 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Job title" 
+              />
+            </div>
+            <div className="flex gap-3">
+              <button 
+                type="submit" 
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+              >
+                Post Job
+              </button>
+              <button 
+                type="button" 
+                onClick={() => {
+                  jobFormRef.current?.reset();
+                  setShowJobForm(false);
+                }}
+                className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

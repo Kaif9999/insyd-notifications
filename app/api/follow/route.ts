@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       },
     });
 
-    // Create notification for the followed user
+    // notification for the followed user
     await prisma.notification.create({
       data: {
         title: "New Follower",
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       },
     });
 
-    // Send email notification to the followed user
+    // email notification to the followed user
     try {
       await sendEmail({
         to: followingEmail,
@@ -115,7 +115,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Find both users
+    // Find both follower and following users
     const [follower, following] = await Promise.all([
       prisma.user.findUnique({ where: { email: followerEmail } }),
       prisma.user.findUnique({ where: { email: followingEmail } })

@@ -21,9 +21,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ notifications: [] });
     }
 
-    // Fix: Use 'userId' instead of 'recipientId'
     const notifications = await prisma.notification.findMany({
-      where: { userId: user.id }, // Changed from recipientId to userId
+      where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: 20,
     });
@@ -61,11 +60,10 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Update notification as read, ensuring it belongs to the user
     const notification = await prisma.notification.updateMany({
       where: {
         id: notificationId,
-        userId: user.id, // Changed from recipientId to userId
+        userId: user.id,
       },
       data: {
         read: true,

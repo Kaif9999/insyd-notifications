@@ -11,17 +11,13 @@ model User {
   id            String   @id @default(cuid())
   email         String   @unique
   name          String?
-  
   blogs         Blog[]
   jobs          Job[]
   notifications Notification[]
   blogLikes     BlogLike[]
   jobApplications JobApplication[]
-  
-  // Follow relationships
   following     Follow[] @relation("UserFollowing")
   followers     Follow[] @relation("UserFollowers")
-  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -30,12 +26,9 @@ model Follow {
   id          String @id @default(cuid())
   followerId  String
   followingId String
-  
   follower    User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
   following   User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
-  
   createdAt DateTime @default(now())
-  
   @@unique([followerId, followingId])
 }
 
@@ -44,10 +37,8 @@ model Job {
   title        String
   company      String
   authorId     String
-  
   author       User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
   applications JobApplication[]
-  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -57,10 +48,8 @@ model Blog {
   title     String
   content   String
   authorId  String
-  
   author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
   likes     BlogLike[]
-  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -72,9 +61,7 @@ model Notification {
   read        Boolean @default(false)
   type        String
   userId      String
-  
   user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
   createdAt   DateTime @default(now())
 }
 
@@ -82,12 +69,9 @@ model BlogLike {
   id     String @id @default(cuid())
   userId String
   blogId String
-  
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   blog   Blog @relation(fields: [blogId], references: [id], onDelete: Cascade)
-  
   createdAt DateTime @default(now())
-  
   @@unique([userId, blogId])
 }
 
@@ -95,11 +79,8 @@ model JobApplication {
   id     String @id @default(cuid())
   userId String
   jobId  String
-  
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   job    Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  
   createdAt DateTime @default(now())
-  
   @@unique([userId, jobId])
 }

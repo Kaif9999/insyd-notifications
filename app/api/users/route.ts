@@ -1,12 +1,38 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+interface UserFromDatabase {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt: Date;
+  followers: Array<{ id: string }>;
+  _count: {
+    followers: number;
+    following: number;
+    blogs: number;
+    jobs: number;
+  };
+}
+
+interface UserWithFollowStatus {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt: string;
+  isFollowing: boolean;
+  followers: number;
+  following: number;
+  blogs: number;
+  jobs: number;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const currentUserEmail = searchParams.get('currentUser');
 
-    console.log('Users API called with:', currentUserEmail); // Debug log
+    console.log('Users API called with:', currentUserEmail);
 
     if (!currentUserEmail) {
       return NextResponse.json(
@@ -20,7 +46,7 @@ export async function GET(request: Request) {
       where: { email: currentUserEmail },
     });
 
-    console.log('Current user found:', currentUser?.id); // Debug log
+    console.log('Current user found:', currentUser?.id);
 
     if (!currentUser) {
       return NextResponse.json(
@@ -29,7 +55,6 @@ export async function GET(request: Request) {
       );
     }
 
-    // Get all users except current user with follow status
     const users = await prisma.user.findMany({
       where: {
         email: { not: currentUserEmail }
@@ -61,10 +86,9 @@ export async function GET(request: Request) {
       }
     });
 
-    console.log('Found users:', users.length); // Debug log
-
-    // Transform data to include isFollowing flag
-    const usersWithFollowStatus = users.map((user: { id: any; email: any; name: any; createdAt: { toISOString: () => any; }; followers: string | any[]; _count: { followers: any; following: any; blogs: any; jobs: any; }; })  => ({
+    console.log('Found users:', users.length);
+    
+    const usersWithFollowStatus: UserWithFollowStatus[] = users.map((user: UserFromDatabase) => ({
       id: user.id,
       email: user.email,
       name: user.name,
