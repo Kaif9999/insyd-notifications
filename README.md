@@ -93,7 +93,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to see the application.
 
-## 📊 Database Schema
+## Database Schema
 
 ### Core Tables
 - **Users**: User profiles and authentication
@@ -111,7 +111,7 @@ Open [http://localhost:3000](http://localhost:3000) to see the application.
 - `like`: Blog like notifications
 - `application`: Job application notifications
 
-## 🔧 API Endpoints
+## API Endpoints
 
 ### Authentication
 - `POST /api/auth/register` - User registration
@@ -136,7 +136,7 @@ Open [http://localhost:3000](http://localhost:3000) to see the application.
 - `GET /api/notifications` - Get user notifications
 - `PATCH /api/notifications` - Mark notifications as read
 
-## 🚀 Deployment
+## Deployment
 
 ### Vercel Deployment
 1. Connect your GitHub repository to Vercel
@@ -147,7 +147,7 @@ Open [http://localhost:3000](http://localhost:3000) to see the application.
 - **Recommended**: Neon PostgreSQL (free tier suitable for 100 DAUs)
 - **Alternative**: Supabase, PlanetScale, or Railway
 
-## 📈 Performance Optimizations
+## Performance Optimizations
 
 ### For 100 DAUs
 - **Polling Interval**: 30 seconds (perfect balance of real-time feel vs efficiency)
