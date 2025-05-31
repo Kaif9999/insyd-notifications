@@ -50,10 +50,9 @@ export async function POST(
       );
     }
 
-    // Check if already liked - Fix: Use correct field order
     const existingLike = await prisma.blogLike.findUnique({
       where: {
-        userId_blogId: { // Fix: Correct order (userId first, then blogId)
+        userId_blogId: {
           userId: liker.id,
           blogId: blogId
         }
